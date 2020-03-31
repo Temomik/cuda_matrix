@@ -16,6 +16,9 @@ public:
     ImageHandler(string fileName, int32_t channelNum = 3);
     void load(string fileName, int32_t channelNum = 3);
     void save(string outFileName) const;
+    void grayConvert();
+    uint8_t getGrayElement(const int32_t it) const;
+    void gausFilter(const int32_t size);
     virtual ~ImageHandler();
 };
 

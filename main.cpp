@@ -10,9 +10,9 @@ using std::endl;
 
 int main() 
 {
-    // ImageHandler image("test.jpg");
-    // image.save("out.png");
-    GausMatrix matrix(5);
-    matrix.print();
+    ImageHandler image("test.jpg");
+    // image.grayConvert();
+    image.gausFilter(9);
+    image.save("out.png");
     return 0;
 }

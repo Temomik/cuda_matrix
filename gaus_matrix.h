@@ -7,18 +7,19 @@ class GausMatrix
 {
 private:
     int32_t variance;
-    double mathEpx;
+    long double mathEpx;
     int32_t size;
-    double* matrix;
+    long double* matrix;
 public : 
-    GausMatrix(const int32_t size);
+    GausMatrix(int32_t size);
     virtual ~GausMatrix();
     void calculateMatrix();
     void print() const;
     void normalize();
-    double getMatrixSumm();
-    void div(const int32_t num);
-    const double* getMatrix() const;
+    long double getMatrixSumm();
+    long double operator[](int32_t it) const;
+    void div(int32_t num);
+    const long double* getMatrix() const;
 };
 
 #endif
