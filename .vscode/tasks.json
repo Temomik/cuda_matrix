@@ -6,7 +6,7 @@
         {
             "label": "echo",
             "type": "shell",
-            "command": "g++ *.cpp -o main.out && ./main.out",
+            "command": "g++ *.cpp -o main.out -w && ./main.out",
             "group": {
                 "kind": "build",
                 "isDefault": true

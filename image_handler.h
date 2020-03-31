@@ -16,7 +16,7 @@ public:
     ImageHandler(string fileName, int32_t channelNum = 3);
     void load(string fileName, int32_t channelNum = 3);
     void save(string outFileName) const;
-    ~ImageHandler();
+    virtual ~ImageHandler();
 };
 
 

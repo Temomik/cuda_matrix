@@ -5,6 +5,7 @@
 
 #include "sub/stb_image_write.h"
 #include "sub/stb_image.h"
+#include <stdexcept>
 
 ImageHandler::ImageHandler(string fileName,int32_t channelNum)
 {
