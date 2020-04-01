@@ -8,8 +8,6 @@
 #include <stdexcept>
 #include "gaus_matrix.h"
 #include <vector>
-#include <sstream>
-#include <iomanip>
 
 ImageHandler::ImageHandler(string fileName, int32_t channelNum)
     :fileName(fileName)
@@ -81,15 +79,16 @@ void ImageHandler::gausFilter(const int32_t size)
                 {
                     for (int32_t m = 0; m < size; m++)
                     {
-                        int32_t tmpInd = (i + p) * 3 * width + j + 3 * (m - size / 2) + k;
-                        if(i + p - size / 2 >= 0)
-                        if (tmpInd >= 0 && tmpInd < maxSize && tmpInd / (width*3) == i+p)
+                        int32_t tmpI = i + p - size / 2 ,
+                        tmpJ = j + 3 * (m - size / 2) + k;
+                        int32_t tmpInd = tmpI * 3 * width + tmpJ;
+                        if (tmpInd >= 0 && tmpInd < maxSize && tmpInd / (width*3) == tmpI)
                         {
                             buff += tmpPixels[tmpInd] * matrix[p * size + m];
                         }
                     }
                 }
-                if(buff <= 255)
+                if(buff <= 255 && buff >= 0)
                     pixels[i * width * 3 + j + k] = buff;
             }
         }
