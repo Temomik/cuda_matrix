@@ -1,6 +1,7 @@
 #include "gaus_matrix.h"
 #include <math.h>
 #include <iomanip>
+#include <sstream>
 
 GausMatrix::GausMatrix(int32_t size)
     :variance(size),mathEpx(static_cast<long double>((size-1)/2)), size(size)
@@ -21,13 +22,15 @@ const long double* GausMatrix::getMatrix() const
 
 void GausMatrix::calculateMatrix()
 {
-    int32_t accuracy = 10;
+    int32_t accuracy = 1;
     for (size_t i = 0; i < size; i++)
     {
         for (size_t j = 0; j < size; j++)
         {
-            int64_t tmp = static_cast<int64_t>(exp(-(pow(i - mathEpx,2)/(2*variance)+ pow(j-mathEpx,2)/(2*variance))) * accuracy);
-            matrix[i * size + j] = static_cast<long double>(tmp)/accuracy;
+            std::stringstream stream;
+            stream << std::fixed << std::setprecision(accuracy);
+            stream << exp(-(pow(i - mathEpx,2)/(2*variance)+ pow(j-mathEpx,2)/(2*variance)));
+            stream >> matrix[i * size + j];
         }
     }
     normalize();
@@ -80,4 +83,9 @@ long double GausMatrix::operator[](int32_t it) const
 {
     if(it < size*size)
         return matrix[it];
+}
+
+int32_t GausMatrix::getSize() const
+{
+    return size;
 }

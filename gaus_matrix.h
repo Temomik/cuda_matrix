@@ -19,6 +19,7 @@ public :
     long double getMatrixSumm();
     long double operator[](int32_t it) const;
     void div(int32_t num);
+    int32_t getSize() const;
     const long double* getMatrix() const;
 };
 

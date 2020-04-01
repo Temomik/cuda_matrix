@@ -4,6 +4,7 @@
 #include <string>
 
 using std::string;
+using std::vector;
 
 class ImageHandler
 {
@@ -17,6 +18,7 @@ public:
     void load(string fileName, int32_t channelNum = 3);
     void save(string outFileName) const;
     void grayConvert();
+    vector<uint8_t> getMatrix() const;
     uint8_t getGrayElement(const int32_t it) const;
     void gausFilter(const int32_t size);
     virtual ~ImageHandler();

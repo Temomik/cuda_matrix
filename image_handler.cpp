@@ -7,10 +7,14 @@
 #include "sub/stb_image.h"
 #include <stdexcept>
 #include "gaus_matrix.h"
+#include <vector>
+#include <sstream>
+#include <iomanip>
 
 ImageHandler::ImageHandler(string fileName, int32_t channelNum)
+    :fileName(fileName)
 {
-    load(fileName);
+    load(fileName,channelNum);
 }
 
 ImageHandler::~ImageHandler()
@@ -58,29 +62,48 @@ uint8_t ImageHandler::getGrayElement(const int32_t it) const
         return 0;
 }
 
+
 void ImageHandler::gausFilter(const int32_t size)
 {
+    vector<uint8_t> tmpPixels = getMatrix();
+    if(size <= 1)
+        return;
     GausMatrix matrix(size);
     int64_t maxSize = width * height * 3;
-    std::cout << maxSize << std::endl;
     for (int32_t i = 0; i < height; i++)
     {
         for (int32_t j = 0; j < width * 3; j += 3)
         {
             for (int32_t k = 0; k < 3; k++)
             {
-                double buff = 0;
-                for (size_t p = 0; p < size; p++)
+                float buff = 0;
+                for (int32_t p = 0; p < size; p++)
                 {
-                    for (size_t m = 0; m < size; m++)
+                    for (int32_t m = 0; m < size; m++)
                     {
-                        int32_t tmpInd = (i + p) * 3 * width + j + 3 * (m - 1) + k;
+                        int32_t tmpInd = (i + p) * 3 * width + j + 3 * (m - size / 2) + k;
+                        if(i + p - size / 2 >= 0)
                         if (tmpInd >= 0 && tmpInd < maxSize && tmpInd / (width*3) == i+p)
-                            buff += pixels[tmpInd] * matrix[p * size + m];
+                        {
+                            buff += tmpPixels[tmpInd] * matrix[p * size + m];
+                        }
                     }
                 }
-                pixels[i * width * 3 + j + k] = buff;
+                if(buff <= 255)
+                    pixels[i * width * 3 + j + k] = buff;
             }
         }
     }
+}
+
+vector<uint8_t> ImageHandler::getMatrix() const
+{
+    vector<uint8_t> result;
+    int64_t len = height * width * numComponents;
+    result.reserve(len);
+    for (size_t i = 0; i < len; i++)
+    {
+        result[i] = pixels[i];
+    }
+    return result;
 }
