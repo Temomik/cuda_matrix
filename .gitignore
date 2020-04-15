@@ -12,3 +12,4 @@
 scripts/*
 !*.py
 .DS_Store
+*.sh
