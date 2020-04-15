@@ -9,3 +9,6 @@
 *.jpeg
 *.bmp
 *.out
+scripts/*
+!*.py
+.DS_Store
