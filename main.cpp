@@ -10,15 +10,15 @@ using std::endl;
 
 int main() 
 {
-    Time handler;
-    ImageHandler image("out.jpg");
-    // image.gausFilterGpu(1);
+    // Time handler;
+    ImageHandler image("test.jpg");
+    // image.gausFilterGpu(10);
     // image.grayConvert();
     // image.concatImage(45,50);
-    handler.start(clockType::cpu);
+    // handler.start(clockType::cpu);
     image.gausFilterCpu(3);
-    handler.stop(clockType::cpu);
-    cout << handler.get();
+    // handler.stop(clockType::cpu);
+    // cout << handler.get();
     image.save("copy.jpg");
     return 0;
 }

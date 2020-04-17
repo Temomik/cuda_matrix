@@ -4,9 +4,9 @@
 #include <sstream>
 
 GausMatrix::GausMatrix(int32_t size)
-    :variance(size),mathEpx(static_cast<long double>((size-1)/2)), size(size)
+    :variance(size),mathEpx(static_cast<double>((size-1)/2)), size(size)
 {
-    matrix = new long double[size*size];
+    matrix = new double[size*size];
     calculateMatrix();
 }
 
@@ -15,7 +15,7 @@ GausMatrix::~GausMatrix()
     delete[] matrix;
 }
 
-const long double* GausMatrix::getMatrix() const
+const double* GausMatrix::getMatrix() const
 {
     return matrix;
 }
@@ -38,7 +38,7 @@ void GausMatrix::calculateMatrix()
 
 void GausMatrix::normalize()
 {
-    long double summ = getMatrixSumm();
+    double summ = getMatrixSumm();
     div(summ);
 }
 
@@ -53,9 +53,9 @@ void GausMatrix::div(int32_t num)
     }
 }
 
-long double GausMatrix::getMatrixSumm()
+double GausMatrix::getMatrixSumm()
 {
-    long double summ = 0;
+    double summ = 0;
     for (size_t i = 0; i < size*size; i++)
     {
         summ += matrix[i];
@@ -66,7 +66,7 @@ long double GausMatrix::getMatrixSumm()
 
 void GausMatrix::print() const
 {
-    long double summ = 0;
+    double summ = 0;
     for (size_t i = 0; i < size; i++)
     {
         for (size_t j = 0; j < size; j++)
@@ -79,7 +79,7 @@ void GausMatrix::print() const
     std::cout << std::fixed << std::setw( 11 ) << std::setprecision( 6 )  << summ << std::endl;   
 }
 
-long double GausMatrix::operator[](int32_t it) const
+double GausMatrix::operator[](int32_t it) const
 {
     if(it < size*size)
         return matrix[it];

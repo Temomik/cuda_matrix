@@ -9,18 +9,18 @@ private:
     int32_t variance;
     long double mathEpx;
     int32_t size;
-    long double* matrix;
+    double* matrix;
 public : 
     GausMatrix(int32_t size);
     virtual ~GausMatrix();
     void calculateMatrix();
     void print() const;
     void normalize();
-    long double getMatrixSumm();
-    long double operator[](int32_t it) const;
+    double getMatrixSumm();
+    double operator[](int32_t it) const;
     void div(int32_t num);
     int32_t getSize() const;
-    const long double* getMatrix() const;
+    const double* getMatrix() const;
 };
 
 #endif
