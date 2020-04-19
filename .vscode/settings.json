@@ -61,6 +61,7 @@
         "utility": "cpp",
         "vector": "cpp",
         "iomanip": "cpp",
-        "strstream": "cpp"
+        "strstream": "cpp",
+        "__functional_base_03": "cpp"
     }
 }

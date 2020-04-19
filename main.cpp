@@ -12,11 +12,13 @@ int main()
 {
     // Time handler;
     ImageHandler image("test.jpg");
-    // image.gausFilterGpu(10);
-    // image.grayConvert();
-    // image.concatImage(45,50);
+    image.grayConvert();
+    // image.concatImage(27/2,35/2);
     // handler.start(clockType::cpu);
-    image.gausFilterCpu(3);
+    image.gausFilterGpu(3,handlerType::gray);
+    // image.gausFilterGpu(3);
+    // image.grayGausFilterCpu(100);
+    // image.gausFilterCpu(3,handlerType::gray);
     // handler.stop(clockType::cpu);
     // cout << handler.get();
     image.save("copy.jpg");

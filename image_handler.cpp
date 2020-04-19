@@ -11,10 +11,10 @@
 #include <iostream>
 #include "time.h"
 #ifdef __linux__
-// #include "cuda_runtime.h"
+#include "cuda_runtime.h"
 #endif
 
-ImageHandler::ImageHandler(string fileName, int32_t channelNum)
+ImageHandler::ImageHandler(string fileName, int64_t channelNum)
     : fileName(fileName)
 {
     load(fileName, channelNum);
@@ -27,7 +27,7 @@ ImageHandler::~ImageHandler()
     delete[] pixels;
 }
 
-void ImageHandler::load(string fileName, int32_t channelNum)
+void ImageHandler::load(string fileName, int64_t channelNum)
 {
     pixels = stbi_load(fileName.c_str(), &width, &height, &numComponents, channelNum);
     if (!pixels)
@@ -39,7 +39,7 @@ void ImageHandler::grayConvert()
     int64_t length = width * height * numComponents;
     for (size_t i = 0; i < length; i += 3)
     {
-        int32_t buff = 0;
+        int64_t buff = 0;
         for (size_t j = 0; j < 3; j++)
         {
             buff += pixels[i + j];
@@ -60,49 +60,64 @@ void ImageHandler::save(string outFileName) const
     stbi_write_jpg(outFileName.c_str(), width, height, numComponents, pixels, width * numComponents);
 }
 
-uint8_t ImageHandler::getGrayElement(int32_t it) const
+uint8_t ImageHandler::getGrayOneComponent(int64_t it,int64_t num) const
 {
     if (it < width * height)
-        return pixels[it * 3];
+        return pixels[it * num];
     else
         return 0;
 }
 
-void ImageHandler::gausFilterCpu(int32_t size)
+void ImageHandler::gausFilterCpu(int64_t size,handlerType type)
 {
-    int32_t maxSize = width * height * 3;
-    uint8_t *tmpPixels = new uint8_t[maxSize];
+    int64_t maxSize = width * height;
+    uint8_t* switchPtr = grayArray;
+    if(type == handlerType::rgb)
+    {
+        switchPtr = pixels;
+        maxSize *= numComponents;
+    }
 
+    uint8_t *tmpPixels = new uint8_t[maxSize];
     if (size <= 1)
         return;
+    
     GausMatrix matrix(size);
-    int32_t twoSize = size * size;
-    int32_t halfSize = size / 2;
+    int64_t twoSize = size * size;
+    int64_t halfSize = size / 2;
     Time handler;
     std::cout << " - start" << std::endl;
     handler.start(clockType::cpu);
-    int32_t xScale = width * 3;
-    double tmpCell = 0;
+    int64_t xScale = width * 3;
 
-    for (int32_t i = 0; i < maxSize; i++)
+    for (int64_t i = 0; i < maxSize; i++)
     {
+        double tmpCell = 0;
         for (int16_t p = 0; p < twoSize; p++)
         {
             int16_t x = p % size - halfSize;
             int16_t y = p / size - halfSize;
-            int32_t tmpMatrixIndex = i + y * xScale + x * numComponents;
+            int64_t tmpMatrixIndex = i + y * xScale + x * numComponents;
             if (tmpMatrixIndex >= 0 && tmpMatrixIndex < maxSize)
-                tmpCell += matrix[p] * pixels[tmpMatrixIndex];
+                tmpCell += matrix[p] * switchPtr[tmpMatrixIndex];
         }
-        // if(tmpCell > 255)
-        //     tmpCell = 255;
+        if(tmpCell > 255)
+            tmpCell = 255;
         tmpPixels[i] = static_cast<uint8_t>(tmpCell);
     }
 
     handler.stop(clockType::cpu);
     std::cout << handler.get() << " - stop" << std::endl;
-    delete[] pixels;
-    pixels = tmpPixels;
+
+    if(type == handlerType::rgb)
+    {
+        delete[] pixels;
+        pixels = tmpPixels;
+        return;
+    }
+    delete[] grayArray;
+    grayArray = tmpPixels;
+    concatGrayComponents();
 }
 
 vector<uint8_t> ImageHandler::getMatrix() const
@@ -117,12 +132,24 @@ vector<uint8_t> ImageHandler::getMatrix() const
     return result;
 }
 
+void ImageHandler::concatGrayComponents()
+{
+    int64_t length = width * height;
+    for (uint64_t i = 0; i < length; i++)
+    {
+        for (uint64_t j = 0; j < numComponents && (j+i*numComponents) < length*numComponents; j++)
+        {
+            pixels[i*numComponents+j] = grayArray[i];
+        }
+    }
+}
+
 #ifdef __linux__
 namespace
 {
-    int32_t customCeil(double num,int32_t del)
+    int64_t customCeil(double num,int64_t del)
     {
-        if(static_cast<int32_t>(num) % del > 0)
+        if(static_cast<int64_t>(num) % del > 0)
         {
             num /= del;
             num++;
@@ -133,50 +160,87 @@ namespace
         return num;
     }
 
-__global__ void gausFilter(uint8_t *inBuffer, uint8_t *outBuffer, uint32_t width, uint32_t height, double *gausMatrix, uint32_t matrixSize)
+__global__ void gausFilter(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize)
 {
-    int32_t x = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t y = blockIdx.y * blockDim.y + threadIdx.y;
-    
+    int64_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    int64_t y = blockIdx.y * blockDim.y + threadIdx.y;
+
     if (x < width && y < height)
     {
-        int32_t cord = y*width+x;
-        int32_t halfMatrixSize = matrixSize /  2;
-        for (int32_t i = 0; i < matrixSize; i++)
+        int64_t cord = y*width+x;
+        int64_t halfMatrixSize = matrixSize /  2;
+        double tmpCell = 0;
+        for (int64_t i = 0; i < matrixSize; i++)
         {
-            for (int32_t j = 0; j < matrixSize; j++)
+            for (int64_t j = 0; j < matrixSize; j++)
             {
-                int32_t tmpCord = cord + width * (i - halfMatrixSize) + (j - halfMatrixSize)*3;
+                int64_t tmpCord = cord + width * (i - halfMatrixSize) + (j - halfMatrixSize)*3;
                 if(tmpCord >= 0 && tmpCord < width*height)
                 {
-                    // if(i == 0 && j == 0)
-                    // printf("%f\n",gausMatrix[0]);
-                    // outBuffer[cord] = inBuffer[cord];
-                    outBuffer[cord] += gausMatrix[i*matrixSize+j]*inBuffer[tmpCord];
+                    tmpCell += gausMatrix[i*matrixSize+j]*inBuffer[tmpCord];
                 }
             }
         }
-                
-        // for (int16_t p = 0; p < twoSize; p++)
-        // {
-        //     int16_t x = p % size - halfSize;
-        //     int16_t y = p / size - halfSize;
-        //     int32_t tmpMatrixIndex = i + y * xScale + x * numComponents;
-        //     if (tmpMatrixIndex >= 0 && tmpMatrixIndex < maxSize)
-        //         tmpPixels[i] += matrix[p] * pixels[tmpMatrixIndex];
-        // }
-        // outBuffer[cord] = inBuffer[cord];
+        outBuffer[cord] = (tmpCell > 255)? 255 : tmpCell; 
+    }
+}
+    const int32_t block_size = 32;
+    const int32_t halfGausSize = 1;
+    const int32_t transactionsSize = 4;
+
+__global__ void gausFilterGray(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize)
+{
+    int64_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    int64_t y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    __shared__ char buff[(block_size + 2 * halfGausSize) * transactionsSize * (block_size + 2 * halfGausSize) * transactionsSize];
+    // {
+        int32_t cord = y * width + x;
+        int32_t sharedCord = (y % block_size) * block_size + (x % block_size);
+        int32_t length = height * width;
+        if (cord >= 0 && cord < length)
+        {
+            reinterpret_cast<uint32_t *>(buff)[sharedCord / 4] = reinterpret_cast<uint32_t *>(inBuffer)[cord * 4];
+        }
+    // }
+    __syncthreads();
+
+    for (int8_t p = 0; p < transactionsSize; p++)
+    {
+        if (x < width && y < height)
+        {
+            // int32_t cord = y * width + (x+p);
+            // int32_t halfMatrixSize = matrixSize /  2;
+            // double tmpCell = 0;
+            // for (int32_t i = 0; i < matrixSize; i++)
+            // {
+            //     for (int32_t j = 0; j < matrixSize; j++)
+            //     {
+            //         int32_t tmpCord = cord + width * (i - halfMatrixSize) + (j - halfMatrixSize)*3;
+            //         if(tmpCord >= 0 && tmpCord < width*height)
+            //         {
+            //             tmpCell += gausMatrix[i*matrixSize+j];
+            //         }
+            //     }
+            // }
+            outBuffer[(y * width + x + p)] = buff[sharedCord + p]; 
+        }
     }
 }
 } // namespace
 #endif
 
 #ifdef __linux__
-void ImageHandler::gausFilterGpu(int32_t size)
-{
-    int32_t bufferSize = width * height * numComponents;
+void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
+{   
+    int64_t bufferSize = width * height;
+    if (type == handlerType::rgb)
+    {
+       bufferSize *= numComponents;
+    }
+
     uint8_t *cudaOutBuffer,
-        *cudaInBuffer;
+            *cudaInBuffer;
     double *gausMatrix;
     GausMatrix matrix(size);
 
@@ -197,25 +261,65 @@ void ImageHandler::gausFilterGpu(int32_t size)
         cudaFree(cudaInBuffer);
         std::runtime_error("Fail allocate gpu memory to gausMatrix");
     }
-	cudaMemcpy(cudaInBuffer, pixels, bufferSize, cudaMemcpyHostToDevice);
-	cudaMemcpy(gausMatrix, matrix.getMatrix(), size*size*sizeof(double), cudaMemcpyHostToDevice);
+
+
+    dim3 block(block_size, block_size),
+        grid(customCeil(width * numComponents, block_size), customCeil(height,block_size));
+        
+    if(type == handlerType::rgb)
+    {
+        grid.x *= numComponents;
+        cudaMemcpy(cudaInBuffer, pixels, bufferSize, cudaMemcpyHostToDevice);
+    } else
+    {
+        cudaMemcpy(cudaInBuffer, grayArray, bufferSize, cudaMemcpyHostToDevice);
+    }
+    cudaMemcpy(gausMatrix, matrix.getMatrix(), size*size*sizeof(double), cudaMemcpyHostToDevice);	
     
-    dim3 block(32, 32),
-        grid(customCeil(width * numComponents, 32), customCeil(height,32));
     cudaEvent_t startTime;
     cudaEvent_t stopTime;
     cudaEventCreate(&startTime);
     cudaEventCreate(&stopTime);
     cudaEventRecord(startTime);
-    gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size);
+    printf("strat\n");
+
+    if(type == handlerType::rgb)
+    {
+        gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size); // without optimizations 
+    } else
+    {
+        // gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width, height, gausMatrix, size); // without optimizations
+        {
+            grid.x /= transactionsSize;
+            // grid.y /= transactionsSize;
+            gausFilterGray<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width, height, gausMatrix, size); // opimizated
+        }
+    }
+    
     cudaDeviceSynchronize();
-    cudaEventSynchronize(stopTime);
+      cudaError_t error = cudaGetLastError();
+    if(error != cudaSuccess)
+    {
+        printf("CUDA error: %s\n", cudaGetErrorString(error));
+    }
+
+    
     cudaEventRecord(stopTime);
+    cudaEventSynchronize(stopTime);
+    printf("stop\n");
     float resultTime;
     cudaEventElapsedTime(&resultTime, startTime, stopTime);
     printf("GPU time: %f miliseconds\n", resultTime);
-	cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
-    cudaFree(cudaOutBuffer);
+    if(type == handlerType::rgb)
+    {
+	    cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
+    } else
+    {
+	    cudaMemcpy(grayArray, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
+        concatGrayComponents();
+    }
+
+    cudaFree(cudaOutBuffer); 
     cudaFree(cudaInBuffer);
     cudaFree(gausMatrix);
 }
@@ -224,30 +328,30 @@ void ImageHandler::gausFilterGpu(int32_t size)
 void ImageHandler::fillGrayArray()
 {
     size_t length = height * width;
-    for (size_t i = 0; i < length; i += numComponents)
+    for (size_t i = 0; i < length; i++)
     {
-        grayArray[i] = pixels[i];
+        grayArray[i] = pixels[i*numComponents];
     }
 }
 
-void ImageHandler::concatImage(uint32_t x, uint32_t y)
+void ImageHandler::concatImage(uint64_t x, uint64_t y)
 {
-    uint32_t newlength = height * width * numComponents * x * y;
+    uint64_t newlength = height * width * numComponents * x * y;
     uint8_t *newPixels = new uint8_t[newlength];
-    uint32_t baseXScale = width * 3,
+    uint64_t baseXScale = width * 3,
              xScale = baseXScale * x,
              yScale = height * y;
-    for (uint32_t i = 0; i < yScale; i += height)
+    for (uint64_t i = 0; i < yScale; i += height)
     {
-        for (uint32_t j = 0; j < xScale; j += baseXScale)
+        for (uint64_t j = 0; j < xScale; j += baseXScale)
         {
-            for (uint32_t k = 0; k < height; k++)
+            for (uint64_t k = 0; k < height; k++)
             {
-                for (uint32_t m = 0; m < baseXScale; m += numComponents)
+                for (uint64_t m = 0; m < baseXScale; m += numComponents)
                 {
-                    for (uint32_t p = 0; p < numComponents; p++)
+                    for (uint64_t p = 0; p < numComponents; p++)
                     {
-                        uint32_t tmpNewCord = i * xScale + j + k * xScale + m + p;
+                        uint64_t tmpNewCord = i * xScale + j + k * xScale + m + p;
                         if (tmpNewCord >= 0 && tmpNewCord < newlength)
                         {
                             newPixels[tmpNewCord] = pixels[k * baseXScale + m + p];

@@ -7,6 +7,12 @@
 using std::string;
 using std::vector;
 
+enum handlerType
+{
+    gray,
+    rgb
+};
+
 class ImageHandler
 {
 private:
@@ -17,17 +23,18 @@ private:
     // __global__ void gausFilter(uint8_t *src, uint8_t *dst, int width, int height);
 public:
     ImageHandler() = default;
-    ImageHandler(string fileName, int32_t channelNum = 3);
-    void load(string fileName, int32_t channelNum = 3);
+    ImageHandler(string fileName, int64_t channelNum = 3);
+    void load(string fileName, int64_t channelNum = 3);
     void save(string outFileName) const;
     void grayConvert();
     vector<uint8_t> getMatrix() const;
-    uint8_t getGrayElement(int32_t it) const;
-    void gausFilterCpu(int32_t size);
-    void concatImage(uint32_t x, uint32_t y);
-    void gausFilterGpu(int32_t size);
+    uint8_t getGrayOneComponent(int64_t it,int64_t num) const;
+    void gausFilterCpu(int64_t size,handlerType type = handlerType::rgb);
+    void concatImage(uint64_t x, uint64_t y);
+    void gausFilterGpu(int64_t size, handlerType type = handlerType::rgb);
     virtual ~ImageHandler();
 protected:
+    void concatGrayComponents();
     void fillGrayArray();
 };
 

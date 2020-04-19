@@ -13,3 +13,6 @@ scripts/*
 !*.py
 .DS_Store
 *.sh
+*.jpg alias
+*.ppm
+*tar*
