@@ -10,17 +10,17 @@ using std::endl;
 
 int main() 
 {
-    // Time handler;
-    ImageHandler image("test.jpg");
-    image.grayConvert();
-    // image.concatImage(27/2,35/2);
-    // handler.start(clockType::cpu);
-    image.gausFilterGpu(3,handlerType::gray);
-    // image.gausFilterGpu(3);
-    // image.grayGausFilterCpu(100);
-    // image.gausFilterCpu(3,handlerType::gray);
-    // handler.stop(clockType::cpu);
-    // cout << handler.get();
-    image.save("copy.jpg");
+    {
+        ImageHandler image("test.jpg");
+        image.grayConvert();
+        image.gausFilterGpu(3,handlerType::gray);
+        image.save("gpu.jpg");
+    }
+    {
+        ImageHandler image("test.jpg");
+        image.grayConvert();
+        image.gausFilterCpu(3,handlerType::gray);
+        image.save("cpu.jpg");
+    }
     return 0;
 }

@@ -60,7 +60,7 @@ void ImageHandler::save(string outFileName) const
     stbi_write_jpg(outFileName.c_str(), width, height, numComponents, pixels, width * numComponents);
 }
 
-uint8_t ImageHandler::getGrayOneComponent(int64_t it,int64_t num) const
+uint8_t ImageHandler::getGrayOneComponent(int64_t it, int64_t num) const
 {
     if (it < width * height)
         return pixels[it * num];
@@ -68,48 +68,53 @@ uint8_t ImageHandler::getGrayOneComponent(int64_t it,int64_t num) const
         return 0;
 }
 
-void ImageHandler::gausFilterCpu(int64_t size,handlerType type)
+void ImageHandler::gausFilterCpu(int64_t size, handlerType type)
 {
     int64_t maxSize = width * height;
-    uint8_t* switchPtr = grayArray;
-    if(type == handlerType::rgb)
+    uint8_t *switchPtr = grayArray;
+    int64_t xScale = width;
+    uint8_t tmpNumOfComponents = 1;
+    if (type == handlerType::rgb)
     {
+        tmpNumOfComponents = numComponents;
         switchPtr = pixels;
         maxSize *= numComponents;
+        xScale *= 3;
     }
 
-    uint8_t *tmpPixels = new uint8_t[maxSize];
     if (size <= 1)
         return;
-    
+
+    uint8_t *tmpPixels = new uint8_t[maxSize];
     GausMatrix matrix(size);
     int64_t twoSize = size * size;
     int64_t halfSize = size / 2;
     Time handler;
-    std::cout << " - start" << std::endl;
+    std::cout << "start" << std::endl;
     handler.start(clockType::cpu);
-    int64_t xScale = width * 3;
 
     for (int64_t i = 0; i < maxSize; i++)
     {
-        double tmpCell = 0;
+        int32_t tmpCell = 0;
         for (int16_t p = 0; p < twoSize; p++)
         {
             int16_t x = p % size - halfSize;
             int16_t y = p / size - halfSize;
-            int64_t tmpMatrixIndex = i + y * xScale + x * numComponents;
-            if (tmpMatrixIndex >= 0 && tmpMatrixIndex < maxSize)
-                tmpCell += matrix[p] * switchPtr[tmpMatrixIndex];
+            int64_t borderCheck = i % xScale + x * numComponents;
+            // if (borderCheck >= 0 && borderCheck < xScale)
+            {
+                int64_t tmpMatrixIndex = i + y * xScale + x * tmpNumOfComponents;
+                if (tmpMatrixIndex >= 0 && tmpMatrixIndex < maxSize)
+                    tmpCell += matrix[p] * switchPtr[tmpMatrixIndex];
+            }
         }
-        if(tmpCell > 255)
-            tmpCell = 255;
         tmpPixels[i] = static_cast<uint8_t>(tmpCell);
     }
 
     handler.stop(clockType::cpu);
     std::cout << handler.get() << " - stop" << std::endl;
 
-    if(type == handlerType::rgb)
+    if (type == handlerType::rgb)
     {
         delete[] pixels;
         pixels = tmpPixels;
@@ -137,9 +142,9 @@ void ImageHandler::concatGrayComponents()
     int64_t length = width * height;
     for (uint64_t i = 0; i < length; i++)
     {
-        for (uint64_t j = 0; j < numComponents && (j+i*numComponents) < length*numComponents; j++)
+        for (uint64_t j = 0; j < numComponents && (j + i * numComponents) < length * numComponents; j++)
         {
-            pixels[i*numComponents+j] = grayArray[i];
+            pixels[i * numComponents + j] = grayArray[i];
         }
     }
 }
@@ -147,83 +152,102 @@ void ImageHandler::concatGrayComponents()
 #ifdef __linux__
 namespace
 {
-    int64_t customCeil(double num,int64_t del)
+int64_t customCeil(double num, int64_t del)
+{
+    if (static_cast<int64_t>(num) % del > 0)
     {
-        if(static_cast<int64_t>(num) % del > 0)
-        {
-            num /= del;
-            num++;
-        } else
-        {
-            num /= del;
-        }
-        return num;
+        num /= del;
+        num++;
     }
+    else
+    {
+        num /= del;
+    }
+    return num;
+}
 
-__global__ void gausFilter(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize)
+__global__ void gausFilter(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize, uint8_t numComponents = 1)
 {
     int64_t x = blockIdx.x * blockDim.x + threadIdx.x;
     int64_t y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (x < width && y < height)
     {
-        int64_t cord = y*width+x;
-        int64_t halfMatrixSize = matrixSize /  2;
-        double tmpCell = 0;
+        int64_t cord = y * width + x;
+        int64_t halfMatrixSize = matrixSize / 2;
+        int32_t tmpCell = 0;
         for (int64_t i = 0; i < matrixSize; i++)
         {
             for (int64_t j = 0; j < matrixSize; j++)
             {
-                int64_t tmpCord = cord + width * (i - halfMatrixSize) + (j - halfMatrixSize)*3;
-                if(tmpCord >= 0 && tmpCord < width*height)
+                int64_t tmpCord = cord + width * (i - halfMatrixSize) + (j - halfMatrixSize) * numComponents;
+                if (tmpCord >= 0 && tmpCord < width * height)
                 {
-                    tmpCell += gausMatrix[i*matrixSize+j]*inBuffer[tmpCord];
+                    tmpCell += gausMatrix[i * matrixSize + j] * inBuffer[tmpCord];
                 }
             }
         }
-        outBuffer[cord] = (tmpCell > 255)? 255 : tmpCell; 
+        outBuffer[cord] = (tmpCell > 255) ? 255 : tmpCell;
     }
 }
-    const int32_t block_size = 32;
-    const int32_t halfGausSize = 1;
-    const int32_t transactionsSize = 4;
+const int32_t blockSize = 32;
+const int32_t halfGausSize = 1;
+const int32_t transactionsSize = 4;
 
 __global__ void gausFilterGray(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize)
 {
-    int64_t x = blockIdx.x * blockDim.x + threadIdx.x;
-    int64_t y = blockIdx.y * blockDim.y + threadIdx.y;
+    int32_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t y = blockIdx.y * blockDim.y + threadIdx.y;
+    int32_t sharedX = x % blockSize;
+    int32_t sharedY = y % blockSize;
 
-    __shared__ char buff[(block_size + 2 * halfGausSize) * transactionsSize * (block_size + 2 * halfGausSize) * transactionsSize];
-    // {
-        int32_t cord = y * width + x;
-        int32_t sharedCord = (y % block_size) * block_size + (x % block_size);
-        int32_t length = height * width;
-        if (cord >= 0 && cord < length)
-        {
-            reinterpret_cast<uint32_t *>(buff)[sharedCord / 4] = reinterpret_cast<uint32_t *>(inBuffer)[cord * 4];
-        }
-    // }
-    __syncthreads();
+    int32_t length = height * width;
+    int32_t tmpWidth = width / transactionsSize;
+    int32_t cord = y * tmpWidth + x;
+    int32_t sharedCord = (sharedY + halfGausSize) * (blockSize + 2 * halfGausSize) + sharedX + halfGausSize;
 
-    for (int8_t p = 0; p < transactionsSize; p++)
+    __shared__ uint8_t buff[(blockSize + 2 * halfGausSize) * transactionsSize * (blockSize + 2 * halfGausSize) * transactionsSize];
+    if (cord >= 0 && x < tmpWidth)
     {
-        if (x < width && y < height)
+        if (sharedY == 0 && y != 0)
         {
-            // int32_t cord = y * width + (x+p);
-            // int32_t halfMatrixSize = matrixSize /  2;
-            // double tmpCell = 0;
-            // for (int32_t i = 0; i < matrixSize; i++)
-            // {
-            //     for (int32_t j = 0; j < matrixSize; j++)
-            //     {
-            //         int32_t tmpCord = cord + width * (i - halfMatrixSize) + (j - halfMatrixSize)*3;
-            //         if(tmpCord >= 0 && tmpCord < width*height)
-            //         {
-            //             tmpCell += gausMatrix[i*matrixSize+j];
-            //         }
-            //     }
-            // }
-            outBuffer[(y * width + x + p)] = buff[sharedCord + p]; 
+            reinterpret_cast<uint32_t *>(buff)[sharedCord - halfGausSize * (blockSize + 2 * halfGausSize)] = reinterpret_cast<uint32_t *>(inBuffer)[cord - width / 4 * halfGausSize];
+        }
+        if (sharedY == (blockSize - 1) && y != height)
+        {
+            reinterpret_cast<uint32_t *>(buff)[sharedCord + halfGausSize * (blockSize + 2 * halfGausSize)] = reinterpret_cast<uint32_t *>(inBuffer)[cord + width / 4 * halfGausSize];
+        }
+        if (sharedX == 0 && x != 0)
+        {
+            reinterpret_cast<uint32_t *>(buff)[sharedCord - halfGausSize] = reinterpret_cast<uint32_t *>(inBuffer)[cord - halfGausSize];
+        }
+        if (sharedX == (blockSize - 1) && (x * transactionsSize) != width)
+        {
+            reinterpret_cast<uint32_t *>(buff)[sharedCord + halfGausSize] = reinterpret_cast<uint32_t *>(inBuffer)[cord + halfGausSize];
+        }
+        reinterpret_cast<uint32_t *>(buff)[sharedCord] = reinterpret_cast<uint32_t *>(inBuffer)[cord];
+        __syncthreads();
+
+        __shared__ double sharedGaus[9];
+        if (cord < 9)
+        {
+            sharedGaus[cord] = gausMatrix[cord];
+        }
+        __syncthreads();
+
+        for (int32_t p = 0; p < transactionsSize; p++)
+        {
+            int32_t tmpCord = cord * transactionsSize + p;
+            int tmpCell = 0;
+            for (int32_t i = 0; i < matrixSize; i++)
+            {
+                for (int32_t j = 0; j < matrixSize; j++)
+                {
+                    // sharedCord = sharedY * (blockSize + 2 * halfGausSize) * transactionsSize + sharedX * transactionsSize ;
+                    tmpCell += gausMatrix[i * matrixSize + j] * buff[sharedCord * transactionsSize + (j - halfGausSize) + (i - halfGausSize) *(blockSize + 2 * halfGausSize) * 4  + p];
+                }
+            }
+            (outBuffer)[cord * transactionsSize + p] = tmpCell;
         }
     }
 }
@@ -232,15 +256,15 @@ __global__ void gausFilterGray(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t w
 
 #ifdef __linux__
 void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
-{   
+{
     int64_t bufferSize = width * height;
     if (type == handlerType::rgb)
     {
-       bufferSize *= numComponents;
+        bufferSize *= numComponents;
     }
 
     uint8_t *cudaOutBuffer,
-            *cudaInBuffer;
+        *cudaInBuffer;
     double *gausMatrix;
     GausMatrix matrix(size);
 
@@ -255,27 +279,23 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
         std::runtime_error("Fail allocate gpu memory to cudaInBuffer");
     }
 
-    if (cudaMalloc(&gausMatrix, size*size*sizeof(double)) != cudaSuccess)
+    if (cudaMalloc(&gausMatrix, size * size * sizeof(double)) != cudaSuccess)
     {
         cudaFree(cudaOutBuffer);
         cudaFree(cudaInBuffer);
         std::runtime_error("Fail allocate gpu memory to gausMatrix");
     }
 
-
-    dim3 block(block_size, block_size),
-        grid(customCeil(width * numComponents, block_size), customCeil(height,block_size));
-        
-    if(type == handlerType::rgb)
+    if (type == handlerType::rgb)
     {
-        grid.x *= numComponents;
         cudaMemcpy(cudaInBuffer, pixels, bufferSize, cudaMemcpyHostToDevice);
-    } else
+    }
+    else
     {
         cudaMemcpy(cudaInBuffer, grayArray, bufferSize, cudaMemcpyHostToDevice);
     }
-    cudaMemcpy(gausMatrix, matrix.getMatrix(), size*size*sizeof(double), cudaMemcpyHostToDevice);	
-    
+    cudaMemcpy(gausMatrix, matrix.getMatrix(), size * size * sizeof(double), cudaMemcpyHostToDevice);
+
     cudaEvent_t startTime;
     cudaEvent_t stopTime;
     cudaEventCreate(&startTime);
@@ -283,43 +303,51 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
     cudaEventRecord(startTime);
     printf("strat\n");
 
-    if(type == handlerType::rgb)
+    if (type == handlerType::rgb)
     {
-        gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size); // without optimizations 
-    } else
+        dim3 block(blockSize, blockSize),
+            grid(customCeil(width * numComponents, blockSize), customCeil(height, blockSize));
+        gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size,numComponents); // without optimizations
+    }
+    else
     {
-        // gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width, height, gausMatrix, size); // without optimizations
         {
-            grid.x /= transactionsSize;
-            // grid.y /= transactionsSize;
+            // dim3 block(blockSize, blockSize),
+            //     grid(customCeil(width, blockSize), customCeil(height,blockSize));
+            // gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width, height, gausMatrix, size); // without optimizations
+        } {
+            dim3 block(blockSize, blockSize),
+                grid(customCeil(width, blockSize * 4), customCeil(height, blockSize));
+            std::cout << customCeil(width, blockSize * 4) << std::endl;
             gausFilterGray<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width, height, gausMatrix, size); // opimizated
         }
     }
-    
+
     cudaDeviceSynchronize();
-      cudaError_t error = cudaGetLastError();
-    if(error != cudaSuccess)
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
     {
-        printf("CUDA error: %s\n", cudaGetErrorString(error));
+        // printf("CUDA error: %s\n", cudaGetErrorString(error));
+        throw std::runtime_error(cudaGetErrorString(error));
     }
 
-    
     cudaEventRecord(stopTime);
     cudaEventSynchronize(stopTime);
     printf("stop\n");
     float resultTime;
     cudaEventElapsedTime(&resultTime, startTime, stopTime);
     printf("GPU time: %f miliseconds\n", resultTime);
-    if(type == handlerType::rgb)
+    if (type == handlerType::rgb)
     {
-	    cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
-    } else
+        cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
+    }
+    else
     {
-	    cudaMemcpy(grayArray, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
+        cudaMemcpy(grayArray, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
         concatGrayComponents();
     }
 
-    cudaFree(cudaOutBuffer); 
+    cudaFree(cudaOutBuffer);
     cudaFree(cudaInBuffer);
     cudaFree(gausMatrix);
 }
@@ -330,7 +358,7 @@ void ImageHandler::fillGrayArray()
     size_t length = height * width;
     for (size_t i = 0; i < length; i++)
     {
-        grayArray[i] = pixels[i*numComponents];
+        grayArray[i] = pixels[i * numComponents];
     }
 }
 
