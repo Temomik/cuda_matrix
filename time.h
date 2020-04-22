@@ -7,10 +7,16 @@ using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
 using std::chrono::duration;
 
-enum clockType
+enum ClockType
 {
     cpu,
     gpu
+};
+
+enum TimeType
+{
+    milliseconds = 1000,
+    seconds = 1
 };
 
 class Time
@@ -20,9 +26,9 @@ private:
     double time;
 public:
     Time() = default;
-    void start(clockType type);
-    void stop(clockType type);
-    double get() const;
+    void start(ClockType type);
+    void stop(ClockType type);
+    double getElapsed(TimeType type) const;
     ~Time() = default;
 };
 

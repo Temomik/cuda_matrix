@@ -91,7 +91,7 @@ void ImageHandler::gausFilterCpu(int64_t size, handlerType type)
     int64_t halfSize = size / 2;
     Time handler;
     std::cout << "start" << std::endl;
-    handler.start(clockType::cpu);
+    handler.start(ClockType::cpu);
 
     for (int64_t i = 0; i < maxSize; i++)
     {
@@ -111,8 +111,8 @@ void ImageHandler::gausFilterCpu(int64_t size, handlerType type)
         tmpPixels[i] = static_cast<uint8_t>(tmpCell);
     }
 
-    handler.stop(clockType::cpu);
-    std::cout << handler.get() << " - stop" << std::endl;
+    handler.stop(ClockType::cpu);
+    std::cout << handler.getElapsed(TimeType::milliseconds) << " - stop" << std::endl;
 
     if (type == handlerType::rgb)
     {
@@ -191,12 +191,12 @@ __global__ void gausFilter(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width
     }
 }
 const int32_t blockSize = 32;
-const int32_t halfGausSize = 1;
 const int32_t transactionsSize = 4;
 const int32_t sharedMemorySize = blockSize * transactionsSize * blockSize * transactionsSize;
 
-__global__ void gausFilterGray(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize)
+__global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize, uint16_t step = 1)
 {
+    int32_t halfGausSize = matrixSize/2;
     int32_t globalX = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t globalY = blockIdx.y * blockDim.y + threadIdx.y;
     int32_t x = globalX - halfGausSize * ( 1 + 2 * blockIdx.x);
@@ -239,7 +239,7 @@ __global__ void gausFilterGray(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t w
                 {
                     for (int32_t j = 0; j < matrixSize; j++)
                     {
-                        tmpCell += gausMatrix[i * matrixSize + j] * buff[sharedCord * transactionsSize + (i - halfGausSize) * blockSize * transactionsSize + j - halfGausSize + p];
+                        tmpCell += gausMatrix[i * matrixSize + j] * buff[sharedCord * transactionsSize + (i - halfGausSize) * blockSize * transactionsSize + (j - halfGausSize) * step + p];
                     }
                 }
                 transactionsBuffer[p] = tmpCell;
@@ -247,6 +247,9 @@ __global__ void gausFilterGray(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t w
         reinterpret_cast<uint32_t *>(outBuffer)[cord] = *(reinterpret_cast<uint32_t*>(transactionsBuffer));
     }
 }
+
+ 
+
 } // namespace
 #endif
 
@@ -299,11 +302,21 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
     cudaEventRecord(startTime);
     printf("strat\n");
 
+    const int32_t halfGausSize = size/2;
+    
     if (type == handlerType::rgb)
     {
-        dim3 block(blockSize, blockSize),
-            grid(customCeil(width * numComponents, blockSize), customCeil(height, blockSize));
-        gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size,numComponents); // without optimizations
+        // {
+        //     dim3 block(blockSize, blockSize),
+        //         grid(customCeil(width * numComponents, blockSize), customCeil(height, blockSize));
+        //     gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size,numComponents); // without optimizations
+        // }
+        {
+            printf("%d\n", customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize));
+            dim3 block(blockSize, blockSize),
+                grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(height, (blockSize - 2 * halfGausSize)));
+            gausFilterOptimized<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents / transactionsSize, height, gausMatrix, size,numComponents); // opimizated
+        }
     }
     else
     {
@@ -313,8 +326,8 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
             // gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width, height, gausMatrix, size); // without optimizations
         } {
             dim3 block(blockSize, blockSize),
-                grid(customCeil(width, (blockSize - halfGausSize) * 4), customCeil(height, (blockSize - halfGausSize)));
-            gausFilterGray<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width/4, height, gausMatrix, size); // opimizated
+                grid(customCeil(width, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(height, (blockSize -  2 * halfGausSize)));
+            gausFilterOptimized<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width/transactionsSize, height, gausMatrix, size); // opimizated
         }
     }
 

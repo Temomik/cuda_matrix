@@ -1,23 +1,23 @@
 #include "time.h"
 
 
-void Time::start(clockType type)
+void Time::start(ClockType type)
 {
-    if(type == clockType::cpu)
+    if(type == ClockType::cpu)
     {
         buffer = high_resolution_clock::now();
     }
 }
 
-void Time::stop(clockType type)
+void Time::stop(ClockType type)
 {
-    if(type == clockType::cpu)
+    if(type == ClockType::cpu)
     {
-        time = duration_cast< duration<double> >(high_resolution_clock::now() - buffer).count();
+        time = duration_cast<duration<double> >(high_resolution_clock::now() - buffer).count();
     }
 }
 
-double Time::get() const
+double Time::getElapsed(TimeType type) const
 {
-    return time;
+    return time*type;
 }

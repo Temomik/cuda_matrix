@@ -12,14 +12,14 @@ int main()
 {
     {
         ImageHandler image("test.jpg");
-        image.grayConvert();
-        image.gausFilterGpu(3,handlerType::gray);
+        // image.grayConvert();
+        image.gausFilterGpu(4);
         image.save("gpu.jpg");
     }
     {
         ImageHandler image("test.jpg");
-        image.grayConvert();
-        image.gausFilterCpu(3,handlerType::gray);
+        // image.grayConvert();
+        image.gausFilterCpu(4);
         image.save("cpu.jpg");
     }
     return 0;
