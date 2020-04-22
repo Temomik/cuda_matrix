@@ -10,7 +10,8 @@
 #include <vector>
 #include <iostream>
 #include "time.h"
-#ifdef __linux__
+#define NVCC
+#ifdef NVCC
 #include "cuda_runtime.h"
 #endif
 
@@ -112,7 +113,7 @@ void ImageHandler::gausFilterCpu(int64_t size, handlerType type)
     }
 
     handler.stop(ClockType::cpu);
-    std::cout << handler.getElapsed(TimeType::milliseconds) << " - stop" << std::endl;
+    std::cout << "GPU time: " << handler.getElapsed(TimeType::milliseconds) << " miliseconds" << std::endl;
 
     if (type == handlerType::rgb)
     {
@@ -149,7 +150,7 @@ void ImageHandler::concatGrayComponents()
     }
 }
 
-#ifdef __linux__
+#ifdef NVCC
 namespace
 {
 int64_t customCeil(double num, int64_t del)
@@ -253,7 +254,7 @@ __global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint6
 } // namespace
 #endif
 
-#ifdef __linux__
+#ifdef NVCC
 void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
 {
     int64_t bufferSize = width * height;
@@ -312,7 +313,6 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
         //     gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size,numComponents); // without optimizations
         // }
         {
-            printf("%d\n", customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize));
             dim3 block(blockSize, blockSize),
                 grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(height, (blockSize - 2 * halfGausSize)));
             gausFilterOptimized<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents / transactionsSize, height, gausMatrix, size,numComponents); // opimizated
