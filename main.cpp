@@ -11,18 +11,17 @@ using std::endl;
 
 int main() 
 {
-    
+    ImageHandler imageCpu(INPUT_FILENAME);
+    ImageHandler imageGpu(INPUT_FILENAME);
+    // image.grayConvert();
+    // image.grayConvert();
+    imageGpu.gausFilterGpu(3);
+    imageCpu.gausFilterCpu(3);
+    if(!imageCpu.compare(imageGpu))
     {
-        ImageHandler image(INPUT_FILENAME);
-        // image.grayConvert();
-        image.gausFilterGpu(4);
-        image.save("gpu.jpg");
+        cout << "(";
+        return 1;
     }
-    {
-        ImageHandler image(INPUT_FILENAME);
-        // image.grayConvert();
-        image.gausFilterCpu(4);
-        image.save("cpu.jpg");
-    }
+    cout << "ok";
     return 0;
 }

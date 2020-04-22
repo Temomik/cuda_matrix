@@ -7,7 +7,7 @@
 using std::string;
 using std::vector;
 
-enum handlerType
+enum HandlerType
 {
     gray,
     rgb
@@ -29,9 +29,10 @@ public:
     void grayConvert();
     vector<uint8_t> getMatrix() const;
     uint8_t getGrayOneComponent(int64_t it,int64_t num) const;
-    void gausFilterCpu(int64_t size,handlerType type = handlerType::rgb);
+    void gausFilterCpu(int64_t size,HandlerType type = HandlerType::rgb);
     void concatImage(uint64_t x, uint64_t y);
-    void gausFilterGpu(int64_t size, handlerType type = handlerType::rgb);
+    void gausFilterGpu(int64_t size, HandlerType type = HandlerType::rgb);
+    bool compare(ImageHandler& other,HandlerType type = HandlerType::rgb) const;
     virtual ~ImageHandler();
 protected:
     void concatGrayComponents();

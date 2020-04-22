@@ -9,6 +9,7 @@
 #include "gaus_matrix.h"
 #include <vector>
 #include <iostream>
+#include <algorithm>
 #include "time.h"
 #define NVCC
 #ifdef NVCC
@@ -54,6 +55,26 @@ void ImageHandler::grayConvert()
     fillGrayArray();
 }
 
+bool ImageHandler::compare(ImageHandler& other, HandlerType type) const
+{
+    int64_t width = std::min(this->width,other.width);
+    int64_t height = std::min(this->height,other.height);
+    
+    int32_t length = width * height;
+    if(type == HandlerType::rgb)
+    {
+        length *= std::min(numComponents,other.numComponents);
+    }
+    for (int64_t i = 0; i < length; i++)
+    {
+        if (pixels[i] != other.pixels[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void ImageHandler::save(string outFileName) const
 {
     if (!pixels)
@@ -69,13 +90,13 @@ uint8_t ImageHandler::getGrayOneComponent(int64_t it, int64_t num) const
         return 0;
 }
 
-void ImageHandler::gausFilterCpu(int64_t size, handlerType type)
+void ImageHandler::gausFilterCpu(int64_t size, HandlerType type)
 {
     int64_t maxSize = width * height;
     uint8_t *switchPtr = grayArray;
     int64_t xScale = width;
     uint8_t tmpNumOfComponents = 1;
-    if (type == handlerType::rgb)
+    if (type == HandlerType::rgb)
     {
         tmpNumOfComponents = numComponents;
         switchPtr = pixels;
@@ -91,31 +112,26 @@ void ImageHandler::gausFilterCpu(int64_t size, handlerType type)
     int64_t twoSize = size * size;
     int64_t halfSize = size / 2;
     Time handler;
-    std::cout << "start" << std::endl;
+    std::cout << "start CPU" << std::endl;
     handler.start(ClockType::cpu);
 
-    for (int64_t i = 0; i < maxSize; i++)
+    for (int16_t p = 0; p < twoSize; p++)
     {
-        int32_t tmpCell = 0;
-        for (int16_t p = 0; p < twoSize; p++)
+        for (int64_t i = 0; i < maxSize; i++)
         {
             int16_t x = p % size - halfSize;
             int16_t y = p / size - halfSize;
             int64_t borderCheck = i % xScale + x * numComponents;
-            // if (borderCheck >= 0 && borderCheck < xScale)
-            {
                 int64_t tmpMatrixIndex = i + y * xScale + x * tmpNumOfComponents;
                 if (tmpMatrixIndex >= 0 && tmpMatrixIndex < maxSize)
-                    tmpCell += matrix[p] * switchPtr[tmpMatrixIndex];
-            }
+                    tmpPixels[i] += matrix[p] * switchPtr[tmpMatrixIndex];
         }
-        tmpPixels[i] = static_cast<uint8_t>(tmpCell);
     }
 
     handler.stop(ClockType::cpu);
-    std::cout << "GPU time: " << handler.getElapsed(TimeType::milliseconds) << " miliseconds" << std::endl;
+    std::cout << "CPU time: " << handler.getElapsed(TimeType::milliseconds) << " miliseconds" << std::endl;
 
-    if (type == handlerType::rgb)
+    if (type == HandlerType::rgb)
     {
         delete[] pixels;
         pixels = tmpPixels;
@@ -255,10 +271,10 @@ __global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint6
 #endif
 
 #ifdef NVCC
-void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
+void ImageHandler::gausFilterGpu(int64_t size, HandlerType type)
 {
     int64_t bufferSize = width * height;
-    if (type == handlerType::rgb)
+    if (type == HandlerType::rgb)
     {
         bufferSize *= numComponents;
     }
@@ -286,7 +302,7 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
         std::runtime_error("Fail allocate gpu memory to gausMatrix");
     }
 
-    if (type == handlerType::rgb)
+    if (type == HandlerType::rgb)
     {
         cudaMemcpy(cudaInBuffer, pixels, bufferSize, cudaMemcpyHostToDevice);
     }
@@ -301,11 +317,11 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
     cudaEventCreate(&startTime);
     cudaEventCreate(&stopTime);
     cudaEventRecord(startTime);
-    printf("strat\n");
+    printf("strat GPU\n");
 
     const int32_t halfGausSize = size/2;
     
-    if (type == handlerType::rgb)
+    if (type == HandlerType::rgb)
     {
         // {
         //     dim3 block(blockSize, blockSize),
@@ -345,7 +361,7 @@ void ImageHandler::gausFilterGpu(int64_t size, handlerType type)
     float resultTime;
     cudaEventElapsedTime(&resultTime, startTime, stopTime);
     printf("GPU time: %f miliseconds\n", resultTime);
-    if (type == handlerType::rgb)
+    if (type == HandlerType::rgb)
     {
         cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
     }
