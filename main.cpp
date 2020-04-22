@@ -16,11 +16,11 @@ int main()
         image.gausFilterGpu(3,handlerType::gray);
         image.save("gpu.jpg");
     }
-    // {
-    //     ImageHandler image("test.jpg");
-    //     image.grayConvert();
-    //     image.gausFilterCpu(3,handlerType::gray);
-    //     image.save("cpu.jpg");
-    // }
+    {
+        ImageHandler image("test.jpg");
+        image.grayConvert();
+        image.gausFilterCpu(3,handlerType::gray);
+        image.save("cpu.jpg");
+    }
     return 0;
 }

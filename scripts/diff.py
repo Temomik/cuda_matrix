@@ -14,5 +14,5 @@ else:
     width, height = img1.size
     for i in range(height):
         for j in range(width):
-            if img1.getpixel((i, j)) != img2.getpixel((i, j))  and (i < 450) and (j < 450):
+            if img1.getpixel((i, j)) != img2.getpixel((i, j)):
                 print(img1.getpixel((i, j)),img2.getpixel((i, j)), i,j)
