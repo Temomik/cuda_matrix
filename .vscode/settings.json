@@ -62,6 +62,20 @@
         "vector": "cpp",
         "iomanip": "cpp",
         "strstream": "cpp",
-        "__functional_base_03": "cpp"
+        "__functional_base_03": "cpp",
+        "clocale": "cpp",
+        "codecvt": "cpp",
+        "condition_variable": "cpp",
+        "deque": "cpp",
+        "fstream": "cpp",
+        "numeric": "cpp",
+        "queue": "cpp",
+        "random": "cpp",
+        "stack": "cpp",
+        "thread": "cpp",
+        "*.tcc": "cpp",
+        "memory_resource": "cpp",
+        "cinttypes": "cpp",
+        "filesystem": "cpp"
     }
 }

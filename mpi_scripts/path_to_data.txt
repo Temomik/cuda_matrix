@@ -1,0 +1,1 @@
+/Users/artemr/Documents/labs/cuda/5/mpi_scripts/
