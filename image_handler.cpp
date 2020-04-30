@@ -11,7 +11,7 @@
 #include <iostream>
 #include <algorithm>
 #include "time.h"
-#define NVCC
+// #define NVCC
 #ifdef NVCC
 #include "cuda_runtime.h"
 #endif

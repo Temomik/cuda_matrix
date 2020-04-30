@@ -25,7 +25,8 @@ for i in range(chunk_count):
         command = "cp " +  path + " " + os.path.abspath(str(i + 1))
         os.system(command)
         f.write(path.split("\'")[1] + "\n");
-    os.system("tar -xzf " + str(i + 1) + ".tar.gz " + str(i + 1) + "/")
+    f.close()
+    os.system("tar -zcf " + str(i + 1) + ".tar.gz " + str(i + 1) + "/")
     os.system("rm -rf " + str(i + 1))
 
 f = open("path_to_data.txt","w+")
