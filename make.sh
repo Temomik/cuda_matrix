@@ -11,3 +11,10 @@ echo running
 
 # nvcc -c -O3  -arch sm_30  -I/home/rapira/opt/usr/local/include -I/home/rapira/opt/usr/local/include/openmpi *.cu -w
 # nvcc -lm  -lcudart -lcublas  -L/home/rapira/opt/usr/local/lib/  -lmpi -lopen-rte -lopen-pal -ldl -lnsl -lutil -lm *.o -o a.out
+
+
+
+
+
+
+mpiicc *.o -lcudart -lcublas -L usr/local/cuda/lib64 -I usr/local/cuda/include

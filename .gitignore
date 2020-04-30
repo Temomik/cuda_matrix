@@ -15,3 +15,4 @@ scripts/*
 *.jpg alias
 *.ppm
 *tar*
+mpi_out/
