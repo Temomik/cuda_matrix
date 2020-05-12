@@ -2,6 +2,7 @@ import numpy as np
 import PIL
 from PIL import Image
 import os
+import sys
 
 def get_files(source):
     paths = []
@@ -13,7 +14,11 @@ def get_files(source):
 def delegate(arr,chunks):
     return [arr[i * len(arr) // chunks : (i+1) * len(arr) // chunks] for i in range(chunks)]
 
-chunk_count = 6
+if len(sys.argv) == 2:
+    chunk_count = int(sys.argv[1])
+else:
+    chunk_count = 6
+
 images_path = get_files("../../images")
 chunks = delegate(images_path,chunk_count)
 
