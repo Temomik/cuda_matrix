@@ -1,16 +1,9 @@
 if [ $1 ==  "make" ]
 then
-    # for HOST in self tablet rapira
-    for HOST in self rapira
+    for HOST in ptaxom rapira
     do
-        if [ $HOST == 'self' ]
-        then
-            mpic++ *.cpp -w -O3
-        else
-            scp *.cpp *.h $HOST:mpi_source
-            # scp main.cpp $HOST:mpi_source
-            ssh -t $HOST 'mpic++ mpi_source/*.cpp'
-        fi
+        scp *.cpp *.h make.sh $HOST:mpi_source
+        ssh -t $HOST 'sh mpi_source/make.sh'
     done
 else
     # mpirun -n $1 --hostfile hostfile ./a.out
