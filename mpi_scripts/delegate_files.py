@@ -8,7 +8,8 @@ def get_files(source):
     paths = []
     for root, dirs, files in os.walk(source):
         for file in sorted(files):
-            paths.append(os.path.abspath(os.path.join(root, '\'' +  file+ '\'')))
+            if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                paths.append(os.path.abspath(os.path.join(root, '\'' +  file + '\'')))
     return paths
         
 def delegate(arr,chunks):
@@ -19,7 +20,7 @@ if len(sys.argv) == 2:
 else:
     chunk_count = 6
 
-images_path = get_files("../../images")
+images_path = get_files("../images_small")
 chunks = delegate(images_path,chunk_count)
 
 for i in range(chunk_count):

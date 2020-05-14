@@ -31,7 +31,7 @@ public:
     uint8_t getGrayOneComponent(int64_t it,int64_t num) const;
     void gausFilterCpu(int64_t size,HandlerType type = HandlerType::rgb);
     void concatImage(uint64_t x, uint64_t y);
-    void gausFilterGpu(int64_t size, HandlerType type = HandlerType::rgb);
+    void gausFilterGpu(int64_t size, double& elapsedTime, HandlerType type = HandlerType::rgb);
     bool compare(ImageHandler& other,HandlerType type = HandlerType::rgb) const;
     virtual ~ImageHandler();
 protected:

@@ -11,7 +11,7 @@
 #include <iostream>
 #include <algorithm>
 #include "time.h"
-// #define NVCC
+#define NVCC
 #ifdef NVCC
 #include "cuda_runtime.h"
 #endif
@@ -112,8 +112,8 @@ void ImageHandler::gausFilterCpu(int64_t size, HandlerType type)
     int64_t twoSize = size * size;
     int64_t halfSize = size / 2;
     Time handler;
-    std::cout << "start CPU" << std::endl;
-    handler.start(ClockType::cpu);
+    // std::cout << "start CPU" << std::endl;
+    // handler.start(ClockType::cpu);
 
     for (int16_t p = 0; p < twoSize; p++)
     {
@@ -124,12 +124,12 @@ void ImageHandler::gausFilterCpu(int64_t size, HandlerType type)
             int64_t borderCheck = i % xScale + x * numComponents;
                 int64_t tmpMatrixIndex = i + y * xScale + x * tmpNumOfComponents;
                 if (tmpMatrixIndex >= 0 && tmpMatrixIndex < maxSize)
-                    tmpPixels[i] += matrix[p] * switchPtr[tmpMatrixIndex];
+                    tmpPixels[i] += static_cast<double>(matrix[p]) * static_cast<double>(switchPtr[tmpMatrixIndex]);
         }
     }
 
-    handler.stop(ClockType::cpu);
-    std::cout << "CPU time: " << handler.getElapsed(TimeType::milliseconds) << " miliseconds" << std::endl;
+    // handler.stop(ClockType::cpu);
+    // std::cout << "CPU time: " << handler.getElapsed(TimeType::milliseconds) << " miliseconds" << std::endl;
 
     if (type == HandlerType::rgb)
     {
@@ -271,7 +271,7 @@ __global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint6
 #endif
 
 #ifdef NVCC
-void ImageHandler::gausFilterGpu(int64_t size, HandlerType type)
+void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType type)
 {
     int64_t bufferSize = width * height;
     if (type == HandlerType::rgb)
@@ -317,7 +317,7 @@ void ImageHandler::gausFilterGpu(int64_t size, HandlerType type)
     cudaEventCreate(&startTime);
     cudaEventCreate(&stopTime);
     cudaEventRecord(startTime);
-    printf("strat GPU\n");
+    // printf("strat GPU\n");
 
     const int32_t halfGausSize = size/2;
     
@@ -351,16 +351,17 @@ void ImageHandler::gausFilterGpu(int64_t size, HandlerType type)
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess)
     {
-        // printf("CUDA error: %s\n", cudaGetErrorString(error));
-        throw std::runtime_error(cudaGetErrorString(error));
+        printf("CUDA error: %s\n", cudaGetErrorString(error));
+        throw std::runtime_error("gpu Error");
     }
 
     cudaEventRecord(stopTime);
     cudaEventSynchronize(stopTime);
-    printf("stop\n");
+    // printf("stop\n");
     float resultTime;
     cudaEventElapsedTime(&resultTime, startTime, stopTime);
-    printf("GPU time: %f miliseconds\n", resultTime);
+    // printf("GPU time: %f miliseconds\n", resultTime);
+    elapsedTime = resultTime;
     if (type == HandlerType::rgb)
     {
         cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
