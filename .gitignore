@@ -14,4 +14,4 @@ scripts/*
 .DS_Store
 *.jpg alias
 *.ppm
-*tar*
+*.tar.*
