@@ -224,7 +224,7 @@ __global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint6
     int32_t cord = y * width + x;
     int32_t sharedCord = sharedY * blockSize + sharedX;
 
-    __shared__ uint8_t buff[sharedMemorySize];
+    extern __shared__ uint8_t buff[];
     uint8_t transactionsBuffer[transactionsSize] = {0}; 
     if(cord < 0 || cord >=  height * width)
     {
@@ -302,14 +302,14 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
         std::runtime_error("Fail allocate gpu memory to gausMatrix");
     }
 
-    if (type == HandlerType::rgb)
-    {
-        cudaMemcpy(cudaInBuffer, pixels, bufferSize, cudaMemcpyHostToDevice);
-    }
-    else
-    {
-        cudaMemcpy(cudaInBuffer, grayArray, bufferSize, cudaMemcpyHostToDevice);
-    }
+    // if (type == HandlerType::rgb)
+    // {
+    //     cudaMemcpy(cudaInBuffer, pixels, bufferSize, cudaMemcpyHostToDevice);
+    // }
+    // else
+    // {
+    //     cudaMemcpy(cudaInBuffer, grayArray, bufferSize, cudaMemcpyHostToDevice);
+    // }
     cudaMemcpy(gausMatrix, matrix.getMatrix(), size * size * sizeof(double), cudaMemcpyHostToDevice);
 
     cudaEvent_t startTime;
@@ -321,6 +321,9 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
 
     const int32_t halfGausSize = size/2;
     
+        // checkCuda(cudaMemcpyAsync(&d_a[offset], &a[offset],
+        //                           streamBytes, cudaMemcpyHostToDevice,
+        //                           stream[i]));
     if (type == HandlerType::rgb)
     {
         // {
@@ -329,9 +332,28 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
         //     gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size,numComponents); // without optimizations
         // }
         {
+            const int32_t streamCount = 10;
+            cudaStream_t stream[streamCount];
+            for(int32_t i = 0; i < streamCount; i++)
+            {
+                cudaStreamCreate(&stream[i]);
+            }
+
+            int32_t tmpSize = static_cast<int32_t>(bufferSize / streamCount);
+
             dim3 block(blockSize, blockSize),
-                grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(height, (blockSize - 2 * halfGausSize)));
-            gausFilterOptimized<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents / transactionsSize, height, gausMatrix, size,numComponents); // opimizated
+                grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(height, ((blockSize - 2 * halfGausSize)*streamCount )));
+            
+            for(int32_t i = 0; i < streamCount; i++)
+            {
+                cudaMemcpyAsync(cudaInBuffer + tmpSize * i, pixels + tmpSize * i,tmpSize, cudaMemcpyHostToDevice, stream[i]);
+                gausFilterOptimized<<<grid, block, sharedMemorySize,stream[i]>>>(cudaInBuffer + tmpSize * i, cudaOutBuffer + tmpSize * i, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents); // opimizated
+                cudaMemcpyAsync(pixels + tmpSize * i, cudaOutBuffer + tmpSize * i, tmpSize, cudaMemcpyDeviceToHost, stream[i]);
+            }
+            for(int32_t i = 0; i < streamCount; i++)
+            {
+                cudaStreamDestroy(stream[i]);
+            }
         }
     }
     else
@@ -362,15 +384,15 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
     cudaEventElapsedTime(&resultTime, startTime, stopTime);
     // printf("GPU time: %f miliseconds\n", resultTime);
     elapsedTime = resultTime;
-    if (type == HandlerType::rgb)
-    {
-        cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
-    }
-    else
-    {
-        cudaMemcpy(grayArray, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
-        concatGrayComponents();
-    }
+    // if (type == HandlerType::rgb)
+    // {
+    //     cudaMemcpy(pixels, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
+    // }
+    // else
+    // {
+    //     cudaMemcpy(grayArray, cudaOutBuffer, bufferSize, cudaMemcpyDeviceToHost);
+    //     concatGrayComponents();
+    // }
 
     cudaFree(cudaOutBuffer);
     cudaFree(cudaInBuffer);

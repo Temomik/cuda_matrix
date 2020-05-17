@@ -20,7 +20,7 @@ if len(sys.argv) == 2:
 else:
     chunk_count = 6
 
-images_path = get_files("../images_small")
+images_path = get_files("../images_stream")
 chunks = delegate(images_path,chunk_count)
 
 for i in range(chunk_count):
