@@ -212,7 +212,7 @@ const int32_t blockSize = 32;
 const int32_t transactionsSize = 4;
 const int32_t sharedMemorySize = blockSize * transactionsSize * blockSize * transactionsSize;
 
-__global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize, uint16_t step = 1)
+__global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize, uint16_t step = 1,uint8_t number = 0)
 {
     int32_t halfGausSize = matrixSize/2;
     int32_t globalX = blockIdx.x * blockDim.x + threadIdx.x;
@@ -227,12 +227,12 @@ __global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint6
 
     extern __shared__ uint8_t buff[];
     uint8_t transactionsBuffer[transactionsSize] = {0}; 
-    if(cord < 0 || cord >=  height * width)
-    {
-        reinterpret_cast<uint32_t *>(buff)[sharedCord] = *(reinterpret_cast<uint32_t*>(transactionsBuffer));
-    } else 
+    if(number == 1 || (number == 0 && cord <  (height+1) * width)|| (number == 2 && cord >=  0)|| cord >= 0 || cord <  height * width)
     {
         reinterpret_cast<uint32_t *>(buff)[sharedCord] = reinterpret_cast<uint32_t*>(inBuffer)[cord];
+    } else 
+    {
+        reinterpret_cast<uint32_t *>(buff)[sharedCord] = *(reinterpret_cast<uint32_t*>(transactionsBuffer));
     }
     __syncthreads();
 
@@ -266,113 +266,6 @@ __global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint6
     }
 }
 
-__global__ void gausFilterOptimized1(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize, uint16_t step = 1)
-{
-    int32_t halfGausSize = matrixSize/2;
-    int32_t globalX = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t globalY = blockIdx.y * blockDim.y + threadIdx.y;
-    int32_t x = globalX - halfGausSize * ( 1 + 2 * blockIdx.x);
-    int32_t y = globalY - halfGausSize * ( 1 + 2 * blockIdx.y);
-
-    int32_t sharedX = globalX % blockSize + halfGausSize ;
-    int32_t sharedY = globalY % blockSize + halfGausSize ;
-    int32_t cord = y * width + x;
-    int32_t sharedCord = sharedY * blockSize + sharedX;
-
-    extern __shared__ uint8_t buff[];
-    uint8_t transactionsBuffer[transactionsSize] = {0}; 
-    if(cord < 0 || cord >=  height * width)
-    {
-        reinterpret_cast<uint32_t *>(buff)[sharedCord] = *(reinterpret_cast<uint32_t*>(transactionsBuffer));
-    } else 
-    {
-        reinterpret_cast<uint32_t *>(buff)[sharedCord] = reinterpret_cast<uint32_t*>(inBuffer)[cord];
-    }
-    __syncthreads();
-
-    // __shared__ double sharedGaus[9];
-    // if (cord < 9)
-    // {
-    //     sharedGaus[cord] = gausMatrix[cord];
-    // }
-    // __syncthreads();
-
-    if (x  < width && y < height &&
-        globalX % blockSize >= halfGausSize &&
-        globalX % blockSize < blockSize - halfGausSize &&
-        globalY % blockSize >= halfGausSize &&
-        globalY % blockSize < blockSize - halfGausSize)
-    {
-        for (int32_t p = 0; p < transactionsSize; p++)
-        {
-                int32_t tmpCord = cord * transactionsSize + p;
-                int tmpCell = 0;
-                for (int32_t i = 0; i < matrixSize; i++)
-                {
-                    for (int32_t j = 0; j < matrixSize; j++)
-                    {
-                        tmpCell += gausMatrix[i * matrixSize + j] * buff[sharedCord * transactionsSize + (i - halfGausSize) * blockSize * transactionsSize + (j - halfGausSize) * step + p];
-                    }
-                }
-                transactionsBuffer[p] = tmpCell;
-        }
-        reinterpret_cast<uint32_t *>(outBuffer)[cord] = *(reinterpret_cast<uint32_t*>(transactionsBuffer));
-    }
-}
- 
-__global__ void gausFilterOptimized2(uint8_t *inBuffer, uint8_t *outBuffer, uint64_t width, uint64_t height, double *gausMatrix, uint64_t matrixSize, uint16_t step = 1)
-{
-    int32_t halfGausSize = matrixSize/2;
-    int32_t globalX = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t globalY = blockIdx.y * blockDim.y + threadIdx.y;
-    int32_t x = globalX - halfGausSize * ( 1 + 2 * blockIdx.x);
-    int32_t y = globalY - halfGausSize * ( 1 + 2 * blockIdx.y);
-
-    int32_t sharedX = globalX % blockSize + halfGausSize ;
-    int32_t sharedY = globalY % blockSize + halfGausSize ;
-    int32_t cord = y * width + x;
-    int32_t sharedCord = sharedY * blockSize + sharedX;
-
-    extern __shared__ uint8_t buff[];
-    uint8_t transactionsBuffer[transactionsSize] = {0}; 
-    if(cord < 0 || cord >=  height * width)
-    {
-        reinterpret_cast<uint32_t *>(buff)[sharedCord] = *(reinterpret_cast<uint32_t*>(transactionsBuffer));
-    } else 
-    {
-        reinterpret_cast<uint32_t *>(buff)[sharedCord] = reinterpret_cast<uint32_t*>(inBuffer)[cord];
-    }
-    __syncthreads();
-
-    // __shared__ double sharedGaus[9];
-    // if (cord < 9)
-    // {
-    //     sharedGaus[cord] = gausMatrix[cord];
-    // }
-    // __syncthreads();
-
-    if (x  < width && y < height &&
-        globalX % blockSize >= halfGausSize &&
-        globalX % blockSize < blockSize - halfGausSize &&
-        globalY % blockSize >= halfGausSize &&
-        globalY % blockSize < blockSize - halfGausSize)
-    {
-        for (int32_t p = 0; p < transactionsSize; p++)
-        {
-                int32_t tmpCord = cord * transactionsSize + p;
-                int tmpCell = 0;
-                for (int32_t i = 0; i < matrixSize; i++)
-                {
-                    for (int32_t j = 0; j < matrixSize; j++)
-                    {
-                        tmpCell += gausMatrix[i * matrixSize + j] * buff[sharedCord * transactionsSize + (i - halfGausSize) * blockSize * transactionsSize + (j - halfGausSize) * step + p];
-                    }
-                }
-                transactionsBuffer[p] = tmpCell;
-        }
-        reinterpret_cast<uint32_t *>(outBuffer)[cord] = *(reinterpret_cast<uint32_t*>(transactionsBuffer));
-    }
-}
 } // namespace
 #endif
 
@@ -448,15 +341,12 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
             int32_t tmpSize = static_cast<int32_t>(bufferSize / streamCount);
 
             dim3 block(blockSize, blockSize),
-                grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(customCeil(height, blockSize - 2 * halfGausSize),streamCount ));
+                grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(customCeil(height,streamCount), blockSize - 2 * halfGausSize) );
             
             for(int32_t i = 0; i < streamCount; i++)
-                cudaMemcpyAsync(cudaInBuffer + tmpSize * i, pixels + tmpSize * i,tmpSize, cudaMemcpyHostToDevice, stream[i]);
-            gausFilterOptimized<<<grid, block, sharedMemorySize,stream[0]>>>(cudaInBuffer + tmpSize * 0, cudaOutBuffer + tmpSize * 0, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents); // opimizated
-            gausFilterOptimized1<<<grid, block, sharedMemorySize,stream[1]>>>(cudaInBuffer + tmpSize * 1, cudaOutBuffer + tmpSize * 1, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents); // opimizated
-            gausFilterOptimized2<<<grid, block, sharedMemorySize,stream[2]>>>(cudaInBuffer + tmpSize * 2, cudaOutBuffer + tmpSize * 2, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents); // opimizated
-            for(int32_t i = 0; i < streamCount; i++)
             {
+                cudaMemcpyAsync(cudaInBuffer + tmpSize * i, pixels + tmpSize * i,tmpSize, cudaMemcpyHostToDevice, stream[i]);
+                gausFilterOptimized<<<grid, block, sharedMemorySize,stream[i]>>>(cudaInBuffer + tmpSize * i, cudaOutBuffer + tmpSize * i, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents,i); // opimizated
                 cudaMemcpyAsync(pixels + tmpSize * i, cudaOutBuffer + tmpSize * i, tmpSize, cudaMemcpyDeviceToHost, stream[i]);
             }
 
