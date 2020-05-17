@@ -332,7 +332,7 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
         //     gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size,numComponents); // without optimizations
         // }
         {
-            const int32_t streamCount = 10;
+            const int32_t streamCount = 2;
             cudaStream_t stream[streamCount];
             for(int32_t i = 0; i < streamCount; i++)
             {
@@ -345,15 +345,20 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
                 grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(height, ((blockSize - 2 * halfGausSize)*streamCount )));
             
             for(int32_t i = 0; i < streamCount; i++)
-            {
                 cudaMemcpyAsync(cudaInBuffer + tmpSize * i, pixels + tmpSize * i,tmpSize, cudaMemcpyHostToDevice, stream[i]);
-                gausFilterOptimized<<<grid, block, sharedMemorySize,stream[i]>>>(cudaInBuffer + tmpSize * i, cudaOutBuffer + tmpSize * i, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents); // opimizated
-                cudaMemcpyAsync(pixels + tmpSize * i, cudaOutBuffer + tmpSize * i, tmpSize, cudaMemcpyDeviceToHost, stream[i]);
-            }
             for(int32_t i = 0; i < streamCount; i++)
             {
-                cudaStreamDestroy(stream[i]);
+                gausFilterOptimized<<<grid, block, sharedMemorySize,stream[i]>>>(cudaInBuffer + tmpSize * i, cudaOutBuffer + tmpSize * i, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents); // opimizated
             }
+            for(int32_t i = 0; i < streamCount; i++)
+                cudaMemcpyAsync(pixels + tmpSize * i, cudaOutBuffer + tmpSize * i, tmpSize, cudaMemcpyDeviceToHost, stream[i]);
+
+    // cudaDeviceSynchronize();
+
+    // for(int32_t i = 0; i < streamCount; i++)
+    // {
+    //     cudaStreamDestroy(stream[i]);
+    // }
         }
     }
     else
@@ -368,8 +373,6 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
             gausFilterOptimized<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width/transactionsSize, height, gausMatrix, size); // opimizated
         }
     }
-
-    cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess)
     {

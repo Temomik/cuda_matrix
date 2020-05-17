@@ -83,9 +83,9 @@ int main(int argc, char *argv[])
         }
         int it = 0;
 
-        // Time handler;
+        Time handler;
         std::cout << "start GPU on " << processor_name << " with rank " << rank << std::endl;
-        // handler.start(ClockType::cpu);
+        handler.start(ClockType::cpu);
         double elapsedTime = 0;
         while (std::getline(filenames, tmpFilename))
         {
@@ -98,8 +98,8 @@ int main(int argc, char *argv[])
             image.save(tmpFilename);
             elapsedTime += tmpElapsedTime;
         }
-        // handler.stop(ClockType::cpu);
-        std::cout << "GPU time: " << elapsedTime << " miliseconds on " << processor_name << " with rank " << rank  << std::endl;
+        handler.stop(ClockType::cpu);
+        std::cout << "GPU time: " << "kabo " << handler.getElapsed(TimeType::milliseconds) << " miliseconds on " << processor_name << " with rank " << rank  << std::endl;
 
         std::stringstream tarCommand, scpToRootCommand, rmTmpFolderCommand, rmTrashFilesCommand;
         std::string destName = "artemr";
