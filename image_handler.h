@@ -4,6 +4,12 @@
 #include <string>
 #include <vector>
 
+#define NVCC
+#ifdef NVCC
+// #define CUDA_API_PER_THREAD_DEFAULT_STREAM
+// #define cudaStreamNonBlocking
+#include "cuda_runtime.h"
+#endif
 using std::string;
 using std::vector;
 

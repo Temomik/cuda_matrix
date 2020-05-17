@@ -1,8 +1,8 @@
-clusters=$( expr $1 + 1 )
-cd mpi_scripts/
-python3 delegate_files.py $1
-cd ..
-mpirun -mca btl_tcp_if_exclude virbr0,docker0,lo -n $clusters --hostfile hostfile ./main.exe
+# clusters=$( expr $1 + 1 )
+# cd mpi_scripts/
+# python3 delegate_files.py $1
+# cd ..
+# mpirun -mca btl_tcp_if_exclude virbr0,docker0,lo -n $clusters --hostfile hostfile ./main.exe
 # mpirun -n 1 ./main.exe : -n $1 --hostfile hostfile ./main.exe
 
 # mpirun -n $1 --hostfile hostfile ./a.out

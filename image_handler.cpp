@@ -2,7 +2,6 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-
 #include "sub/stb_image_write.h"
 #include "sub/stb_image.h"
 #include <stdexcept>
@@ -11,10 +10,6 @@
 #include <iostream>
 #include <algorithm>
 #include "time.h"
-#define NVCC
-#ifdef NVCC
-#include "cuda_runtime.h"
-#endif
 
 ImageHandler::ImageHandler(string fileName, int64_t channelNum)
     : fileName(fileName)
@@ -227,7 +222,8 @@ __global__ void gausFilterOptimized(uint8_t *inBuffer, uint8_t *outBuffer, uint6
 
     extern __shared__ uint8_t buff[];
     uint8_t transactionsBuffer[transactionsSize] = {0}; 
-    if(number == 1 || (number == 0 && cord <  (height+1) * width)|| (number == 2 && cord >=  0)|| cord >= 0 || cord <  height * width)
+    // if(number == 1 || (number == 0 && cord <  (height+1) * width)|| (number == 2 && cord >=  0)|| cord >= 0 || cord <  height * width)
+    if(cord >= 0 || cord <  height * width)
     {
         reinterpret_cast<uint32_t *>(buff)[sharedCord] = reinterpret_cast<uint32_t*>(inBuffer)[cord];
     } else 
@@ -323,6 +319,9 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
         // checkCuda(cudaMemcpyAsync(&d_a[offset], &a[offset],
         //                           streamBytes, cudaMemcpyHostToDevice,
         //                           stream[i]));
+    const int32_t streamCount = 3;
+    int32_t tmpSize = static_cast<int32_t>(bufferSize / streamCount);
+    cudaStream_t stream[streamCount];
     if (type == HandlerType::rgb)
     {
         // {
@@ -331,29 +330,26 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
         //     gausFilter<<<grid, block>>>(cudaInBuffer, cudaOutBuffer, width * numComponents, height, gausMatrix, size,numComponents); // without optimizations
         // }
         {
-            const int32_t streamCount = 3;
-            cudaStream_t stream[streamCount];
             for(int32_t i = 0; i < streamCount; i++)
             {
-                cudaStreamCreate(&stream[i]);
+                cudaStreamCreateWithFlags(&stream[i],cudaStreamNonBlocking);
             }
 
-            int32_t tmpSize = static_cast<int32_t>(bufferSize / streamCount);
 
             dim3 block(blockSize, blockSize),
-                grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(customCeil(height,streamCount), blockSize - 2 * halfGausSize) );
+                grid(customCeil(width*numComponents, (blockSize - 2 * halfGausSize) * transactionsSize), customCeil(height/streamCount, blockSize - 2 * halfGausSize) );
             
             for(int32_t i = 0; i < streamCount; i++)
             {
                 cudaMemcpyAsync(cudaInBuffer + tmpSize * i, pixels + tmpSize * i,tmpSize, cudaMemcpyHostToDevice, stream[i]);
                 gausFilterOptimized<<<grid, block, sharedMemorySize,stream[i]>>>(cudaInBuffer + tmpSize * i, cudaOutBuffer + tmpSize * i, width * numComponents / transactionsSize, customCeil(height, streamCount), gausMatrix, size,numComponents,i); // opimizated
-                cudaMemcpyAsync(pixels + tmpSize * i, cudaOutBuffer + tmpSize * i, tmpSize, cudaMemcpyDeviceToHost, stream[i]);
             }
 
-            for(int32_t i = 0; i < streamCount; i++)
-            {
-                cudaStreamDestroy(stream[i]);
-            }
+            // for(int32_t i = 0; i < streamCount; i++)
+            // {
+            //     // cudaStreamSynchronize(stream[i]);
+            //     cudaStreamDestroy(stream[i]);
+            // }
         }
     }
     else
@@ -375,9 +371,14 @@ void ImageHandler::gausFilterGpu(int64_t size, double& elapsedTime, HandlerType 
         throw std::runtime_error("gpu Error");
     }
 
-    cudaEventRecord(stopTime);
-    cudaEventSynchronize(stopTime);
+    // cudaEventRecord(stopTime);
+    // cudaEventSynchronize(stopTime);
     // printf("stop\n");
+    // cudaDeviceSynchronize();
+    for(int32_t i = 0; i < streamCount; i++)
+    {
+        cudaMemcpyAsync(pixels + tmpSize * i, cudaOutBuffer + tmpSize * i, tmpSize, cudaMemcpyDeviceToHost, stream[i]);
+    }
     float resultTime;
     cudaEventElapsedTime(&resultTime, startTime, stopTime);
     // printf("GPU time: %f miliseconds\n", resultTime);

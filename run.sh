@@ -7,13 +7,15 @@ then
         ssh -t $HOST 'sh mpi_source/make.sh'
     done
 else
-    scp -q start.sh hostfile rapira:
-    scp -q mpi_scripts/delegate_files.py rapira:mpi_scripts/  
-    ssh -t rapira  sh start.sh $1
-    cd mpi_scripts
-    python3 untar.py $1
-    cd ../mpi_out
-    rm **.tar**
+    # scp -q start.sh hostfile rapira:
+    # scp -q mpi_scripts/delegate_files.py rapira:mpi_scripts/  
+    # scp -q ric.jpg rapira:
+    ssh -t rapira main.exe
+    # cd mpi_scripts
+    # python3 untar.py $1
+    # cd ../mpi_out
+    # rm **.tar**
+    scp -q rapira:ric1.jpg artemr:Documents/labs/cuda/5/mpi_out/  
     # mpirun -n $1 --hostfile hostfile ./a.out
     # mpirun -n 1 -host 127.0.0.1 ./a.out : -n $1 --hostfile hostfile ./a.out
     # rm mpi_out/*.tar.gz
