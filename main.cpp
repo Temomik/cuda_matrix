@@ -59,8 +59,8 @@ int main(int argc, char *argv[])
     else
     {
         char path[MAX_LENGTH];
-        std::cout <<  whoAmI << std::endl;
         MPI_Recv(path, MAX_LENGTH, MPI_CHAR, root, TAG, MPI_COMM_WORLD, &status);
+        // std::cout <<  whoAmI << "  PATH -  " << path << std::endl;
         std::stringstream scpCommand, tarName, unTarCommand;
         std::cout << path << " " << whoAmI << std::endl;
         std::string folder = "mpi_tmp/", rootName = "rapira", filenamesName = "filenames.txt";
@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
         tarName << std::to_string(rank) << ".tar.gz";
         scpCommand << "scp " << rootName << ":" << path << tarName.str() << " " << folder;
         unTarCommand << "cd " << folder << " && " << "tar -xf " << tarName.str();
+        std::cout <<  whoAmI << "  with rank " << rank << " start clone files" << std::endl;
         system(scpCommand.str().c_str());
         system(unTarCommand.str().c_str());
 
@@ -104,7 +105,6 @@ int main(int argc, char *argv[])
         std::stringstream tarCommand, scpToRootCommand, rmTmpFolderCommand, rmTrashFilesCommand;
         std::string destName = "artemr";
 
-        std::cout << "back forward start " << processor_name << " with rank " << rank << std::endl;
 
         tarCommand << "cd " << folder << " && "<< "tar -zcf " << std::to_string(rank) << ".tar.gz " << std::to_string(rank) << "/";
         scpToRootCommand << "scp " << folder << std::to_string(rank) << ".tar.gz " << destName << ":Documents/labs/cuda/5/mpi_out";
@@ -115,7 +115,10 @@ int main(int argc, char *argv[])
 
         system(rmTrashFilesCommand.str().c_str());
         system(tarCommand.str().c_str());
+        std::cout << "back forward start " << processor_name << " with rank " << rank << std::endl;
+        std::cout << scpToRootCommand.str().c_str() << std::endl;
         system(scpToRootCommand.str().c_str());
+        std::cout << "back forward end " << processor_name << " with rank " << rank << std::endl;
         system(rmTmpFolderCommand.str().c_str());
 
         char arr[sizeof(elapsedTime)];
