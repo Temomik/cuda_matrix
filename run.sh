@@ -1,6 +1,6 @@
 if [ $1 ==  "make" ]
 then
-    for HOST in rapira
+    for HOST in rapira ptaxom
     do
         echo $HOST start build
         scp -q *.cpp *.h make.sh $HOST:mpi_source

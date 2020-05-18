@@ -32,7 +32,6 @@ int main(int argc, char *argv[])
     {
         MPI_Request request = MPI_REQUEST_NULL;
         Time handler;
-        handler.start(ClockType::cpu);
         char path[MAX_LENGTH];
         std::ifstream file;
         file.open("mpi_scripts/path_to_data.txt");
@@ -42,18 +41,22 @@ int main(int argc, char *argv[])
             MPI_Send(path, MAX_LENGTH, MPI_CHAR, i, TAG, MPI_COMM_WORLD);
         }
         double elapsedTime = 0;
+        char trashBuff;
+        bool isTimerStart = false;
         for (size_t i = 1; i < world_size; i++)
         {
-            double tmpElapsedTime = 0;
-            char arr[sizeof(elapsedTime)];
-            std::memcpy(arr,&elapsedTime,sizeof(elapsedTime));
-            MPI_Recv(arr, sizeof(tmpElapsedTime), MPI_CHAR, i, TAG, MPI_COMM_WORLD, &status);
-            std::memcpy(&tmpElapsedTime,arr,sizeof(tmpElapsedTime));
-            std::cout << "Time - " << i << " " << tmpElapsedTime << std::endl;
-            elapsedTime += tmpElapsedTime;
+            MPI_Recv(&trashBuff, 1, MPI_CHAR, i, TAG, MPI_COMM_WORLD, &status);
+            if(!isTimerStart)
+            {
+                isTimerStart = true;
+                handler.start(ClockType::cpu);
+            }
+        }
+        for (size_t i = 1; i < world_size; i++)
+        {
+            MPI_Recv(&trashBuff, 1, MPI_CHAR, i, TAG, MPI_COMM_WORLD, &status);
         }
         handler.stop(ClockType::cpu);
-        std::cout << "Time - " << elapsedTime << std::endl;
         std::cout << "Time true - " << handler.getElapsed(TimeType::milliseconds) << std::endl;
     }
     else
@@ -88,6 +91,8 @@ int main(int argc, char *argv[])
         std::cout << "start GPU on " << processor_name << " with rank " << rank << std::endl;
         // handler.start(ClockType::cpu);
         double elapsedTime = 0;
+        char syncBuff = 's'; 
+        MPI_Send(&syncBuff, 1, MPI_CHAR, 0, TAG, MPI_COMM_WORLD);
         while (std::getline(filenames, tmpFilename))
         {
             double tmpElapsedTime;
@@ -97,8 +102,8 @@ int main(int argc, char *argv[])
             // image.grayConvert();
             image.gausFilterGpu(3,tmpElapsedTime);
             image.save(tmpFilename);
-            elapsedTime += tmpElapsedTime;
         }
+        MPI_Send(&syncBuff, 1, MPI_CHAR, 0, TAG, MPI_COMM_WORLD);
         // handler.stop(ClockType::cpu);
         std::cout << "GPU time: " << elapsedTime << " miliseconds on " << processor_name << " with rank " << rank  << std::endl;
 
@@ -121,9 +126,6 @@ int main(int argc, char *argv[])
         std::cout << "back forward end " << processor_name << " with rank " << rank << std::endl;
         system(rmTmpFolderCommand.str().c_str());
 
-        char arr[sizeof(elapsedTime)];
-        std::memcpy(arr,&elapsedTime,sizeof(elapsedTime));
-        MPI_Send(arr, sizeof(elapsedTime), MPI_CHAR, 0, TAG, MPI_COMM_WORLD);
     }
 
     MPI_Finalize();
